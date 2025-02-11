@@ -26,6 +26,7 @@
           };
           in ''
             install -m 755 -D ${appimageContents}/AppRun $out/bin/${pname}
+            patchShebangs $out/bin/${pname}
             install -m 444 -D ${appimageContents}/io.github.msojocs.wechat_devtools.desktop \
               $out/share/applications/wechat-devtools.desktop
             install -m 444 -D ${appimageContents}/wechat-devtools.png \
@@ -39,7 +40,7 @@
             WeChat DevTools for Linux - Unofficial version
           '';
           homepage = "https://github.com/msojocs/wechat-web-devtools-linux";
-          license = licenses.unfree;
+          # license = licenses.unfree;
           # maintainers = with maintainers; [ MaikoTan ];
           platforms = [ "x86_64-linux" ];
           sourceProvenance = with pkgs.lib.sourceTypes; [ binaryNativeCode ];
