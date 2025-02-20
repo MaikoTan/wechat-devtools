@@ -25,8 +25,6 @@
             inherit pname version src;
           };
           in ''
-            install -m 755 -D ${appimageContents}/AppRun $out/bin/${pname}
-            patchShebangs $out/bin/${pname}
             install -m 444 -D ${appimageContents}/io.github.msojocs.wechat_devtools.desktop \
               $out/share/applications/wechat-devtools.desktop
             install -m 444 -D ${appimageContents}/wechat-devtools.png \
