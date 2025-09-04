@@ -7,10 +7,10 @@
         system = "x86_64-linux";
       };
       pname = "wechat-devtools";
-      version = "1.06.2412040-1";
+      version = "1.06.2504010-2";
       src = pkgs.fetchurl {
         url = "https://github.com/msojocs/wechat-web-devtools-linux/releases/download/v${version}/WeChat_Dev_Tools_v${version}_x86_64_linux.AppImage";
-        sha256 = "fyOJER8xp7o4dvjaXzJSvKsZYJEDbxR0cGMbvvn8Jc8=";
+        sha256 = "AQggXU24U+JAXmXKcbpYJKbfce/JVEH+dkHA0tBfvIw=";
       };
     in
     {
