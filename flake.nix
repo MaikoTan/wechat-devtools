@@ -1,9 +1,11 @@
 {
   description = "WeChat DevTools for Linux - Unofficial version";
 
-  outputs = { self, nixpkgs, flake-utils }: flake-utils.lib.eachDefaultSystem (system:
+  outputs = { self, nixpkgs, flake-utils }:
     let
-      pkgs = import nixpkgs { inherit system; };
+      pkgs = import nixpkgs {
+        system = "x86_64-linux";
+      };
       pname = "wechat-devtools";
       version = "1.06.2412040-1";
       src = pkgs.fetchurl {
@@ -12,7 +14,7 @@
       };
     in
     {
-      packages.default = pkgs.appimageTools.wrapType2 rec {
+      packages.x86_64-linux.default = pkgs.appimageTools.wrapType2 rec {
         inherit pname version src;
 
         extraPkgs = pkgs: with pkgs; [
@@ -35,17 +37,20 @@
 
         meta = with pkgs.lib; {
           mainProgram = "${pname}";
+          platforms = [ "x86_64-linux" ];
+          categories = [ "Development" "IDE" ];
           description = "WeChat DevTools for Linux - Unofficial version";
           longDescription = ''
             WeChat DevTools for Linux - Unofficial version
           '';
           homepage = "https://github.com/msojocs/wechat-web-devtools-linux";
-          # license = licenses.unfree;
-          # maintainers = with maintainers; [ MaikoTan ];
-          platforms = [ "x86_64-linux" ];
+          license = with licenses; [
+            mit # The Packaging Script is under MIT License
+            unfree # WeChat DevTools is not open source software
+          ];
+          maintainers = with maintainers; [ MaikoTan ];
           sourceProvenance = with pkgs.lib.sourceTypes; [ binaryNativeCode ];
         };
       };
-    }
-    );
+    };
 }
