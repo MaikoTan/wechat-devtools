@@ -1,7 +1,12 @@
 {
   description = "WeChat DevTools for Linux - Unofficial version";
 
-  outputs = { self, nixpkgs, flake-utils }:
+  outputs =
+    {
+      self,
+      nixpkgs,
+      flake-utils,
+    }:
     let
       pkgs = import nixpkgs {
         system = "x86_64-linux";
@@ -17,16 +22,19 @@
       packages.x86_64-linux.default = pkgs.appimageTools.wrapType2 rec {
         inherit pname version src;
 
-        extraPkgs = pkgs: with pkgs; [
-          gnome2.GConf
-          xorg.libxkbfile
-        ];
+        extraPkgs =
+          pkgs: with pkgs; [
+            gnome2.GConf
+            xorg.libxkbfile
+          ];
 
-        extraInstallCommands = let
-          appimageContents = pkgs.appimageTools.extractType2 {
-            inherit pname version src;
-          };
-          in ''
+        extraInstallCommands =
+          let
+            appimageContents = pkgs.appimageTools.extractType2 {
+              inherit pname version src;
+            };
+          in
+          ''
             install -m 755 -D ${appimageContents}/AppRun $out/bin/${pname}
             patchShebangs $out/bin/${pname}
             install -m 444 -D ${appimageContents}/io.github.msojocs.wechat_devtools.desktop \
@@ -38,7 +46,10 @@
         meta = with pkgs.lib; {
           mainProgram = "${pname}";
           platforms = [ "x86_64-linux" ];
-          categories = [ "Development" "IDE" ];
+          categories = [
+            "Development"
+            "IDE"
+          ];
           description = "WeChat DevTools for Linux - Unofficial version";
           longDescription = ''
             WeChat DevTools for Linux - Unofficial version
