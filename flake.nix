@@ -34,9 +34,16 @@
               inetutils
               gnome2.GConf
               gnome-shell
-              gtk3 glib xorg.libX11 xorg.libXcomposite xorg.libXrandr xorg.libxshmfence
+              gtk3
+              glib
+              xorg.libX11
+              xorg.libXcomposite
+              xorg.libXrandr
+              xorg.libxshmfence
               fontconfig
-              noto-fonts noto-fonts-cjk-sans noto-fonts-emoji
+              noto-fonts
+              noto-fonts-cjk-sans
+              noto-fonts-emoji
             ];
 
           nativeBuildInputs = [ pkgs.makeWrapper ];
