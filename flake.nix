@@ -24,6 +24,9 @@
           url = "https://github.com/msojocs/wechat-web-devtools-linux/releases/download/v${version}/WeChat_Dev_Tools_v${version}_x86_64_linux.AppImage";
           sha256 = "AQggXU24U+JAXmXKcbpYJKbfce/JVEH+dkHA0tBfvIw=";
         };
+        appimageContents = pkgs.appimageTools.extractType2 {
+          inherit pname version src;
+        };
       in
       {
         packages.default = pkgs.appimageTools.wrapType2 rec {
@@ -43,6 +46,7 @@
               fontconfig
               noto-fonts
               noto-fonts-cjk-sans
+              noto-fonts-cjk-serif
               noto-fonts-emoji
             ];
 
@@ -53,13 +57,7 @@
             export LANG=zh_CN.UTF-8
           '';
 
-          extraInstallCommands =
-            let
-              appimageContents = pkgs.appimageTools.extractType2 {
-                inherit pname version src;
-              };
-            in
-            ''
+          extraInstallCommands = ''
               cat $out/bin/${pname} << EOF
               export LD_LIBRARY_PATH="${pkgs.glib}/lib:${pkgs.gtk3}/lib:${pkgs.xorg.libxshmfence}/lib:\$LD_LIBRARY_PATH"
               # export PATH="${pkgs.glib}/bin:${pkgs.gtk3}/bin"
