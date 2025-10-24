@@ -17,6 +17,12 @@
       let
         pkgs = import nixpkgs {
           inherit system;
+          config = {
+            # As we are using steam-run that is an unfree package
+            # and users has no other way to configure nixpkgs to allow
+            # unfree packages, we need to set this option.
+            allowUnfree = true;
+          };
         };
 
         pname = "wechat-devtools";
