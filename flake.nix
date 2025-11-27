@@ -26,10 +26,10 @@
         };
 
         pname = "wechat-devtools";
-        version = "1.06.2504030-1";
+        version = "1.06.2504060-1";
         src = builtins.fetchTarball {
           url = "https://github.com/msojocs/wechat-web-devtools-linux/releases/download/v${version}/WeChat_Dev_Tools_v${version}_x86_64_linux.tar.gz";
-          sha256 = "sha256-w1pgR/Ay/dIUnBdMg2YPT03CDXBM5G6ZWGBwrK6xO8E=";
+          sha256 = "sha256-K+/ZtGOEvmCQ64QIVFXtu9Qs+BE5dlgMM3SYnJ4y8D4=";
         };
 
         extraPkgs = pkgs: [
