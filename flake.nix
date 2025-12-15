@@ -26,10 +26,13 @@
         };
 
         pname = "wechat-devtools";
-        version = "1.06.2504060-1";
+        version = "2.01.2510250-2";
+        # The unofficial WeChat DevTools binary for Linux
+        # Check releases at:
+        # https://github.com/msojocs/wechat-web-devtools-linux/releases
         src = builtins.fetchTarball {
           url = "https://github.com/msojocs/wechat-web-devtools-linux/releases/download/v${version}/WeChat_Dev_Tools_v${version}_x86_64_linux.tar.gz";
-          sha256 = "sha256-K+/ZtGOEvmCQ64QIVFXtu9Qs+BE5dlgMM3SYnJ4y8D4=";
+          sha256 = "sha256-FdUlhfKYmNni6iEKIaaZ9fxzD+YktvS10BetXmSWCZ4=";
         };
 
         extraPkgs = pkgs: [
@@ -116,7 +119,10 @@
             homepage = "https://github.com/msojocs/wechat-web-devtools-linux";
             downloadPage = "https://github.com/msojocs/wechat-web-devtools-linux/releases";
             changelog = "https://github.com/msojocs/wechat-web-devtools-linux/releases/tag/v${version}";
-            license = pkgs.lib.licenses.mit; # The packaging script is under MIT License
+            license = with pkgs.lib.licenses; [
+              unfree # WeChat DevTools itself is unfree software
+              mit # The packaging script is under MIT License
+            ];
             maintainers = [ pkgs.maintainers.maikotan ];
             sourceProvenance = with pkgs.lib.sourceTypes; [ binaryNativeCode ];
           };
