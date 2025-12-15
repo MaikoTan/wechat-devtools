@@ -58,13 +58,22 @@
           };
           desktopName = "WeChat Devtools";
           genericName = "WeChat Devtools";
-          comment = "The development tools for wechat web develop";
+          comment = "The development tools for wechat miniprogram development";
           categories = [ "Development" "WebDevelopment" "IDE" ];
           terminal = false;
           startupWMClass = "nwjs_mbeenbnhnmdhkbicabncjghgnikfbgjh";
           mimeTypes = [ "x-scheme-handler/wechatide" ];
           extraConfig = {
-            "Name[zh_CN]" = "微信web开发者工具";
+            "Name[zh_CN]" = "微信开发者工具";
+            "Name[zh_TW]" = "微信開發者工具";
+            "Name[en_GB]" = "WeChat Devtools";
+            "Name[fr_FR]" = "Outils de développement WeChat";
+            "Name[ru_RU]" = "Инструменты разработчика WeChat";
+            "Comment[zh_CN]" = "微信小程序开发工具";
+            "Comment[zh_TW]" = "微信小程序開發工具";
+            "Comment[en_GB]" = "The development tools for wechat miniprogram development";
+            "Comment[fr_FR]" = "Outils de développement pour les mini-programmes WeChat";
+            "Comment[ru_RU]" = "Инструменты разработки для мини-программ WeChat";
           };
         };
       in
