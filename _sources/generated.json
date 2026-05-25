@@ -1,0 +1,16 @@
+{
+    "wechat-web-devtools-linux": {
+        "cargoLock": null,
+        "date": null,
+        "extract": null,
+        "name": "wechat-web-devtools-linux",
+        "passthru": null,
+        "pinned": false,
+        "src": {
+            "sha256": "sha256-Y6XOcIBwGhXHpjwbknmQnVIGAswalJKohxf8/+53298=",
+            "type": "tarball",
+            "url": "https://github.com/msojocs/wechat-web-devtools-linux/releases/download/v2.01.2510290-2/WeChat_Dev_Tools_v2.01.2510290-2_x86_64_linux.tar.gz"
+        },
+        "version": "v2.01.2510290-2"
+    }
+}

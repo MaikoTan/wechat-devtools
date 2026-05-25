@@ -1,0 +1,4 @@
+[wechat-web-devtools-linux]
+src.github = "msojocs/wechat-web-devtools-linux"
+
+fetch.tarball = "https://github.com/msojocs/wechat-web-devtools-linux/releases/download/$ver/WeChat_Dev_Tools_$ver_x86_64_linux.tar.gz"
