@@ -1,6 +1,7 @@
 # WeChat Web DevTools - Unofficial Version - NixOS Module
 
-A flake wrapper of the unofficial version of WeChat Web DevTools from [msojocs](https://github.com/msojocs/wechat-web-devtools-linux).
+A flake wrapper of the unofficial version of WeChat Web DevTools from
+[msojocs](https://github.com/msojocs/wechat-web-devtools-linux).
 
 ## Execute Directly
 
@@ -9,8 +10,8 @@ nix run github:MaikoTan/wechat-devtools
 ```
 
 > [!NOTE]
-> This package is an unfree software, you may need to add `allowUnfree = true;` in your Nix configuration,
-> or append `--impure` flag to the command line.
+> This package is an unfree software, you may need to add `allowUnfree = true;`
+> in your Nix configuration, or append `--impure` flag to the command line.
 
 ## Flake Usage
 

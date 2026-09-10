@@ -27,7 +27,7 @@
 
         pname = "wechat-devtools";
 
-        sources = pkgs.callPackage ./_sources/generated.nix {};
+        sources = pkgs.callPackage ./_sources/generated.nix { };
 
         extraPkgs = pkgs: [
           pkgs.nss
@@ -53,7 +53,11 @@
           desktopName = "WeChat Devtools";
           genericName = "WeChat Devtools";
           comment = "The development tools for wechat miniprogram development";
-          categories = [ "Development" "WebDevelopment" "IDE" ];
+          categories = [
+            "Development"
+            "WebDevelopment"
+            "IDE"
+          ];
           terminal = false;
           startupWMClass = "nwjs_mbeenbnhnmdhkbicabncjghgnikfbgjh";
           mimeTypes = [ "x-scheme-handler/wechatide" ];
@@ -80,7 +84,10 @@
 
           src = pkgs.symlinkJoin {
             name = "wechat-devtools-wrapped";
-            paths = [ wrapped desktopItem ];
+            paths = [
+              wrapped
+              desktopItem
+            ];
           };
 
           installPhase = ''
@@ -131,6 +138,16 @@
             sourceProvenance = with pkgs.lib.sourceTypes; [ binaryNativeCode ];
           };
         };
+        checks.statix =
+          pkgs.runCommandLocal "statix-check"
+            {
+              src = ./.;
+              nativeBuildInputs = [ pkgs.statix ];
+            }
+            ''
+              statix check ${./.} --config ${./.}/.statix.toml
+              touch $out
+            '';
       }
     );
 }
