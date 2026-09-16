@@ -1,0 +1,113 @@
+{ pkgs, version ? null, src ? null, enableDesktopItem ? true, extraPkgs ? (p: [ p.nss p.libxshmfence ]) }:
+let
+  # Default source from nvfetcher-generated file
+  defaultSources = pkgs.callPackage ../_sources/generated.nix { };
+  defaultSrc = defaultSources.wechat-web-devtools-linux.src;
+  defaultVersion = defaultSources.wechat-web-devtools-linux.version;
+
+  # Use provided or default values
+  finalSrc = src || defaultSrc;
+  finalVersion = version || defaultVersion;
+
+  # Steam-run with extra packages
+  steam-run = (pkgs.steam.override {
+    inherit extraPkgs;
+  }).run;
+
+  # Wrapper script
+  wrapped = pkgs.writeShellScriptBin "wechat-devtools" ''
+    ${steam-run}/bin/steam-run ${pkgs.bash}/bin/bash ${finalSrc}/bin/wechat-devtools $@
+  '';
+
+  # Desktop item (optional)
+  desktopItem = if enableDesktopItem then pkgs.makeDesktopItem {
+    name = "wechat-devtools";
+    exec = "${wrapped}/bin/wechat-devtools %U";
+    icon = builtins.fetchurl {
+      url = "https://github.com/msojocs/wechat-web-devtools-linux/raw/refs/heads/master/res/icons/wechat-devtools.svg";
+      sha256 = "sha256-QuL0itqB7Ki6NhMEhIh9jkRH3hJ3Upjj4zPZzEUYlkg=";
+    };
+    desktopName = "WeChat Devtools";
+    genericName = "WeChat Devtools";
+    comment = "The development tools for wechat miniprogram development";
+    categories = [
+      "Development"
+      "WebDevelopment"
+      "IDE"
+    ];
+    terminal = false;
+    startupWMClass = "nwjs_mbeenbnhnmdhkbicabncjghgnikfbgjh";
+    mimeTypes = [ "x-scheme-handler/wechatide" ];
+    extraConfig = {
+      "Name[zh_CN]" = "微信开发者工具";
+      "Name[zh_TW]" = "微信開發者工具";
+      "Name[en_GB]" = "WeChat Devtools";
+      "Name[fr_FR]" = "Outils de développement WeChat";
+      "Name[ru_RU]" = "Инструменты разработчика WeChat";
+      "Comment[zh_CN]" = "微信小程序开发工具";
+      "Comment[zh_TW]" = "微信小程序開發工具";
+      "Comment[en_GB]" = "The development tools for wechat miniprogram development";
+      "Comment[fr_FR]" = "Outils de développement pour les mini-programmes WeChat";
+      "Comment[ru_RU]" = "Инструменты разработки для мини-программ WeChat";
+    };
+  } else null;
+
+in pkgs.stdenv.mkDerivation {
+  pname = "wechat-devtools";
+  inherit finalVersion;
+
+  nativeBuildInputs = [ pkgs.makeWrapper ];
+
+  src = pkgs.symlinkJoin {
+    name = "wechat-devtools-wrapped";
+    paths = (if enableDesktopItem then [ wrapped desktopItem ] else [ wrapped ]);
+  };
+
+  installPhase = ''
+    runHook preInstall
+
+    mkdir -p "$out/bin"
+    mkdir -p "$out/share/applications"
+    mkdir -p "$out/share/icons/hicolor/scalable/apps"
+
+    # Copy bin files using install to ensure new files are created
+    if [ -d "$src/bin" ]; then
+      for f in "$src/bin"/*; do
+        [ -e "$f" ] || continue
+        install -D -m755 "$f" "$out/bin/$(basename "$f")"
+      done
+    fi
+
+    # Copy shared data using tar pipeline to force content copy
+    if [ -d "$src/share" ]; then
+      mkdir -p "$out/share"
+      (cd "$src/share" && tar cf - .) | (cd "$out/share" && tar xf -)
+    fi
+
+    runHook postInstall
+  '';
+
+  meta = {
+    mainProgram = "wechat-devtools";
+    platforms = [ "x86_64-linux" ];
+    categories = [
+      "Development"
+      "IDE"
+    ];
+    description = "WeChat DevTools for Linux - Unofficial version";
+    longDescription = ''
+      WeChat DevTools for Linux - Unofficial binary version providing development tools
+      for WeChat Mini Programs on Linux systems. This version uses the pre-compiled
+      binary distribution.
+    '';
+    homepage = "https://github.com/msojocs/wechat-web-devtools-linux";
+    downloadPage = "https://github.com/msojocs/wechat-web-devtools-linux/releases";
+    changelog = "https://github.com/msojocs/wechat-web-devtools-linux/releases/tag/v${finalVersion}";
+    license = with pkgs.lib.licenses; [
+      unfree # WeChat DevTools itself is unfree software
+      mit # The packaging script is under MIT License
+    ];
+    maintainers = [ pkgs.maintainers.maikotan ];
+    sourceProvenance = with pkgs.lib.sourceTypes; [ binaryNativeCode ];
+  };
+}

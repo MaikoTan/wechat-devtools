@@ -6,148 +6,64 @@
     flake-utils.url = "github:numtide/flake-utils";
   };
 
-  outputs =
-    {
-      self,
-      nixpkgs,
-      flake-utils,
-    }:
-    flake-utils.lib.eachDefaultSystem (
-      system:
-      let
-        pkgs = import nixpkgs {
-          inherit system;
-          config = {
-            # As we are using steam-run that is an unfree package
-            # and users has no other way to configure nixpkgs to allow
-            # unfree packages, we need to set this option.
-            allowUnfree = true;
-          };
-        };
-
-        pname = "wechat-devtools";
-
-        sources = pkgs.callPackage ./_sources/generated.nix { };
-
-        extraPkgs = pkgs: [
-          pkgs.nss
-          pkgs.libxshmfence
-        ];
-
-        steam-run =
-          (pkgs.steam.override {
-            inherit extraPkgs;
-          }).run;
-
-        wrapped = pkgs.writeShellScriptBin "wechat-devtools" ''
-          ${steam-run}/bin/steam-run ${pkgs.bash}/bin/bash ${sources.wechat-web-devtools-linux.src}/bin/wechat-devtools $@
-        '';
-
-        desktopItem = pkgs.makeDesktopItem {
-          name = "wechat-devtools";
-          exec = "${wrapped}/bin/wechat-devtools %U";
-          icon = builtins.fetchurl {
-            url = "https://github.com/msojocs/wechat-web-devtools-linux/raw/refs/heads/master/res/icons/wechat-devtools.svg";
-            sha256 = "sha256-QuL0itqB7Ki6NhMEhIh9jkRH3hJ3Upjj4zPZzEUYlkg=";
-          };
-          desktopName = "WeChat Devtools";
-          genericName = "WeChat Devtools";
-          comment = "The development tools for wechat miniprogram development";
-          categories = [
-            "Development"
-            "WebDevelopment"
-            "IDE"
-          ];
-          terminal = false;
-          startupWMClass = "nwjs_mbeenbnhnmdhkbicabncjghgnikfbgjh";
-          mimeTypes = [ "x-scheme-handler/wechatide" ];
-          extraConfig = {
-            "Name[zh_CN]" = "微信开发者工具";
-            "Name[zh_TW]" = "微信開發者工具";
-            "Name[en_GB]" = "WeChat Devtools";
-            "Name[fr_FR]" = "Outils de développement WeChat";
-            "Name[ru_RU]" = "Инструменты разработчика WeChat";
-            "Comment[zh_CN]" = "微信小程序开发工具";
-            "Comment[zh_TW]" = "微信小程序開發工具";
-            "Comment[en_GB]" = "The development tools for wechat miniprogram development";
-            "Comment[fr_FR]" = "Outils de développement pour les mini-programmes WeChat";
-            "Comment[ru_RU]" = "Инструменты разработки для мини-программ WeChat";
-          };
-        };
-      in
-      {
-        packages.default = pkgs.stdenv.mkDerivation {
-          inherit pname;
-          inherit (sources.wechat-web-devtools-linux) version;
-
-          nativeBuildInputs = [ pkgs.makeWrapper ];
-
-          src = pkgs.symlinkJoin {
-            name = "wechat-devtools-wrapped";
-            paths = [
-              wrapped
-              desktopItem
-            ];
+  outputs = { self, nixpkgs, flake-utils }:
+    let
+      # Per-system package builder
+      perSystem = flake-utils.lib.eachDefaultSystem (system:
+        let
+          pkgs = import nixpkgs {
+            inherit system;
+            config = {
+              # steam-run is unfree, so enable unfree packages by default
+              allowUnfree = true;
+            };
           };
 
-          installPhase = ''
-            runHook preInstall
-
-            mkdir -p "$out/bin"
-            mkdir -p "$out/share/applications"
-            mkdir -p "$out/share/icons/hicolor/scalable/apps"
-
-            # Copy bin files using install to ensure new files are created
-            if [ -d "$src/bin" ]; then
-              for f in "$src/bin"/*; do
-                [ -e "$f" ] || continue
-                install -D -m755 "$f" "$out/bin/$(basename "$f")"
-              done
-            fi
-
-            # Copy shared data using tar pipeline to force content copy
-            if [ -d "$src/share" ]; then
-              mkdir -p "$out/share"
-              (cd "$src/share" && tar cf - .) | (cd "$out/share" && tar xf -)
-            fi
-
-            runHook postInstall
-          '';
-
-          meta = {
-            mainProgram = pname;
-            platforms = [ "x86_64-linux" ];
-            categories = [
-              "Development"
-              "IDE"
-            ];
-            description = "WeChat DevTools for Linux - Unofficial version";
-            longDescription = ''
-              WeChat DevTools for Linux - Unofficial binary version providing development tools
-              for WeChat Mini Programs on Linux systems. This version uses the pre-compiled
-              binary distribution.
-            '';
-            homepage = "https://github.com/msojocs/wechat-web-devtools-linux";
-            downloadPage = "https://github.com/msojocs/wechat-web-devtools-linux/releases";
-            changelog = "https://github.com/msojocs/wechat-web-devtools-linux/releases/tag/v${sources.wechat-web-devtools-linux.version}";
-            license = with pkgs.lib.licenses; [
-              unfree # WeChat DevTools itself is unfree software
-              mit # The packaging script is under MIT License
-            ];
-            maintainers = [ pkgs.maintainers.maikotan ];
-            sourceProvenance = with pkgs.lib.sourceTypes; [ binaryNativeCode ];
+          # Package options for the package builder
+          packageOptions = {
+            enableDesktopItem = true;
+            version = null;
+            src = null;
+            extraPkgs = pkgs: [ pkgs.nss pkgs.libxshmfence ];
           };
-        };
-        checks.statix =
-          pkgs.runCommandLocal "statix-check"
-            {
-              src = ./.;
-              nativeBuildInputs = [ pkgs.statix ];
-            }
-            ''
-              statix check ${./.} --config ${./.}/.statix.toml
-              touch $out
-            '';
-      }
-    );
+
+          package = pkgs.callPackage ./packages/default.nix {
+            inherit (packageOptions) enableDesktopItem version src extraPkgs;
+          };
+        in
+        {
+          # This will become packages.<system>.default and packages.<system>.wechat-devtools
+          default = package;
+          wechat-devtools = package;
+
+          # Per-system checks
+          checks = {
+            statix = pkgs.runCommandLocal "statix-check" {
+                src = ./.;
+                nativeBuildInputs = [ pkgs.statix ];
+              } ''
+                statix check ${./.} --config ${./.}/.statix.toml
+                touch $out
+              '';
+          };
+        }
+      );
+
+      # Top-level options (not per system)
+      options = {
+        enableDesktopItem = true;
+        version = null;
+        src = null;
+        extraPkgs = pkgs: [ pkgs.nss pkgs.libxshmfence ];
+      };
+
+      # NixOS module (not system-specific)
+      nixosModule = { config, pkgs, ... }: {
+        imports = [ ./modules/default.nix ];
+      };
+    in
+    perSystem // {
+      options = options;
+      nixosModules.default = nixosModule;
+    };
 }
