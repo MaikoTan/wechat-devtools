@@ -1,0 +1,43 @@
+cmake_minimum_required(VERSION 3.15)
+cmake_policy(SET CMP0091 NEW)
+cmake_policy(SET CMP0042 NEW)
+
+project("skyline_shared_memory")
+
+# node-addon-api 用这个宏在 Windows 上把 Node-API 入口声明为 import。
+add_compile_definitions(BUILDING_NODE_EXTENSION)
+
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+set(CMAKE_CXX_STANDARD 17)
+if(NOT MSVC)
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -frandom-seed=skyline_shared_memory")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -frandom-seed=skyline_shared_memory")
+endif()
+
+# 由 Nix 提供的路径
+set(NODE_ADDON_API_DIR "@NODE_ADDON_API_DIR@" CACHE PATH "node-addon-api include dir")
+set(NODE_API_HEADERS_DIR "@NODE_API_HEADERS_DIR@" CACHE PATH "node_api.h dir")
+set(SPDLOG_DIR "@SPDLOG_DIR@" CACHE PATH "self-built spdlog prefix")
+
+include_directories(${NODE_ADDON_API_DIR} ${NODE_API_HEADERS_DIR} ${SPDLOG_DIR}/include)
+
+set(MODULE_NAME sharedMemory)
+set(SRC_DIR_LIST
+    src/main.cc
+    src/logger.cc
+    src/memory/set.cc
+    src/memory/get.cc
+    src/memory/remove.cc
+    src/memory/manager.cc
+    src/memory/compat.cc
+)
+
+add_library(${MODULE_NAME} SHARED ${SRC_DIR_LIST})
+
+# 静态链接自编的 spdlog：预编译产物只依赖 libstdc++/libm/libgcc_s/libc，
+# 动态链接 nixpkgs 的 libspdlog.so 会因 gcc ABI 不匹配在 Electron 里加载失败。
+target_link_libraries(${MODULE_NAME} PRIVATE rt pthread ${SPDLOG_DIR}/lib/libspdlog.a)
+
+set_target_properties(${MODULE_NAME} PROPERTIES PREFIX "" SUFFIX ".node")

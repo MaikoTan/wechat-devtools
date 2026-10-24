@@ -71,22 +71,77 @@ ln -s "$PWD/openssl-root" vendor/openssl
 openssl 还要进 `buildInputs`，让 `autoPatchelfHook` 把 libssl/libcrypto
 写进 RPATH，否则运行时报 `libcrypto.so.3: cannot open shared object file`。
 
-## 预编译的 Linux 替代二进制
+## 原生模块的来源
 
-这些模块官方只发了 win32 变体（或需要额外工具链），
-采用社区构建的 Linux 产物，装进 `app.asar.unpacked` 对应位置。
+官方 asar 里这些模块只带 win32 变体，Linux 下必须自己准备。
+分两类：**自建**（从源码编译）和 **上游预编译**（官方/npm 发的 Linux 二进制）。
+
+### 自建的模块
+
+以前用 msojocs 仓库的预编译产物，现在全部从源码自己构建，
+derivation 在 `packages/upstream/` 下，每个模块一个文件。
+
+| 模块 | 目标路径 | 源码 |
+| --- | --- | --- |
+| wcc | `node_modules/wcc-exec/wcc.exe` | msojocs/wx-compiler |
+| wcsc | `node_modules/wcc-exec/wcsc.exe` | 同上 |
+| wcc 模块 | `node_modules/wcc-electron/build/Release/wcc.node` | 同上 |
+| wcsc 模块 | `node_modules/wcc-electron/build/Release/wcsc.node` | 同上 |
+| skyline client | `node_modules/skyline-addon/build/skyline.node` | msojocs/skyline-client-server |
+| sharedMemory | `node_modules/sharedMemory/sharedMemory.node` | msojocs/skyline-shared-memory |
+| float-pigment | `node_modules/node-float-pigment-css/float-pigment-css-for-nodejs.node` | msojocs/float-pigment-rust |
+
+四个仓库的构建系统：
+
+- **wx-compiler**：CMake + C++11。官方 `src/module/CMakeLists.txt` 依赖
+  `pnpm` + `cmake-js`（`execute_process` 调 pnpm），sandbox 里跑不通，
+  用干净版 `wx-compiler-CMakeLists.txt` 代替，源码文件列表与官方一致。
+  需要 node-addon-api 的 `napi.h` 和 Electron 的 `node_api.h`。
+- **float-pigment-rust**：napi-rs，`cargo build --release` 出
+  `libnapi_float_pigment.so`，重命名为 `float-pigment-css-for-nodejs.node`。
+- **skyline-client-server/packages/native**：napi-rs，
+  `--no-default-features --features client`，产物重命名为 `skyline.node`。
+  crate 在子目录里，`postUnpack` 把它提到源码根，
+  否则 `buildRustPackage` 找不到 `Cargo.lock`。
+- **skyline-shared-memory**：CMake + vcpkg spdlog + cmake-js，
+  同样用干净版 CMakeLists。
+
+#### 两个必须处理的 ABI 坑
+
+**1. spdlog 必须自己编，不能用 nixpkgs 的。**
+nixpkgs 的 `libspdlog.so` 用新版 gcc 编译，需要 `CXXABI_1.3.15`，
+而 Electron 36.6.0 内置的 libstdc++ 是 gcc 13，最高只到 `CXXABI_1.3.9`。
+所以 derivation 内部用 `stdenv.cc`（gcc 13.3.0）编一份
+`-DSPDLOG_BUILD_SHARED=OFF` 的 `libspdlog.a`，静态链进模块。
+顺带避开了 nixpkgs spdlog 的 `libfmt.so.12` 依赖
+（`--whole-archive` 拉不起传递依赖的符号）。
+
+**2. `<iostream>` 会引入 `GLIBCXX_3.4.32`。**
+nixpkgs 的 gcc 13 头文件在 `<iostream>` 里声明了
+`_ZSt21ios_base_library_initv`，这个符号只在 gcc 15 的 libstdc++ 里提供。
+wcc/wcsc 源码多处 `#include <iostream>`，直接编出来在 Electron 里加载失败。
+`wx-compiler-iostream-stub.cc` 给一个空实现：
+wcc/wcsc 只用 iostream 打日志，不依赖这个初始化函数，
+`std::cout`/`std::cerr` 仍正常。加上桩之后 GLIBCXX 需求回落到 3.4.29。
+
+#### Rust 工具链要单独 pin
+
+pinned nixpkgs 的 rustc 是 1.82.0，编不了 skyline-native（要 1.85）
+和 float-pigment 的依赖（要 1.88）。用 fenix 的
+`rust-toolchain.toml`（channel 1.88.0）现组一个 `rustPlatform`。
+
+上游两个仓库都没提交 `Cargo.lock`（被 `.gitignore`），
+用本地 `cargo build` 生成的版本放在 `packages/upstream/` 下，
+float-pigment 还要靠 `cargoPatches` 把它补进源码树。
+
+### 上游预编译的模块
+
+这两个是官方/npm 直接发的 Linux 二进制，不是第三方重新打包的：
 
 | 模块 | 目标路径 | 来源 |
 | --- | --- | --- |
 | swc | `node_modules/@swc/core/swc.linux-x64-gnu.node` | npm `@swc/core-linux-x64-gnu` |
 | ripgrep | `node_modules/@vscode/ripgrep/bin/rg` | ripgrep-prebuilt v13.0.0-10 |
-| wcc | `node_modules/wcc-exec/wcc.exe` | msojocs/wx-compiler |
-| wcsc | `node_modules/wcc-exec/wcsc.exe` | msojocs/wx-compiler |
-| wcc 模块 | `node_modules/wcc-electron/build/Release/wcc.node` | 同上 |
-| wcsc 模块 | `node_modules/wcc-electron/build/Release/wcsc.node` | 同上 |
-| skyline client | `node_modules/skyline-addon/build/skyline.node` | msojocs/skyline-client-server |
-| sharedMemory | `node_modules/sharedMemory/sharedMemory.node` | msojocs/skyline-shared-memory |
-| float-pigment | `node_modules/node-float-pigment-css/float-pigment-css-for-{nodejs,nwjs}.node` | msojocs/float-pigment-rust |
 
 ### 两个命名坑
 
