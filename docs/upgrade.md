@@ -1,5 +1,44 @@
 # 升级指南
 
+## 查最新版本
+
+官方有一个 JSON API，一条命令就能拿到所有通道的当前版本：
+
+```bash
+curl -s https://devtools.wxqcloud.qq.com.cn/WechatWebDev/nightly/versions/config.json \
+  | jq -r '.channels[] | "\(.id)\t\(.version)"'
+```
+
+输出示例（2026-10-24 查）：
+
+```
+stable        2.02.2608080
+rc            2.02.2609231
+nightly       2.02.2610212
+nightly-old   2.01.2602282
+```
+
+**只跟 `stable` 通道。** `rc` / `nightly` 是预发布，ABI 与原生模块常有不匹配，
+别拿来打包。
+
+拿稳定版的下载地址（url 里的 hash 每次发布都变，必须从 API 取，不能手拼）：
+
+```bash
+curl -s https://devtools.wxqcloud.qq.com.cn/WechatWebDev/nightly/versions/config.json \
+  | jq -r '.channels[] | select(.id=="stable") | .downloads[]
+    | select(.os=="Windows" and .arch=="64") | .url'
+```
+
+历史发布记录（含发布日期）在 `history_stable.json`：
+
+```bash
+curl -s https://devtools.wxqcloud.qq.com.cn/WechatWebDev/nightly/versions/history_stable.json \
+  | jq -r '.history[0:5][] | "\(.version)\t\(.date)"'
+```
+
+版本号规则是 `YYMMDD` + 一位序号，例如 `2.02.2608080` 是 2026-08-08 的第 0 个构建，
+2026-09-30 发布。
+
 ## 换 DevTools 版本
 
 ### 1. 更新 sources.nix
@@ -14,11 +53,21 @@ installer = {
 
 `version` 同时出现在 url 与 version 字段，两处都要改。
 
-计算 sha256：
+**url 里的 `<hash>` 不要手拼**，每次发布都会变，用上面的 API 取：
 
 ```bash
+curl -s https://devtools.wxqcloud.qq.com.cn/WechatWebDev/nightly/versions/config.json \
+  | jq -r '.channels[] | select(.id=="stable") | .downloads[]
+    | select(.os=="Windows" and .arch=="64") | .url'
+```
+
+算 sha256（二选一）：
+
+```bash
+# 下载后本地算
 nix hash file --sri --type sha256 wechat_devtools_<version>_win32_x64.exe
-# 或
+
+# 或让 nix 自己拉（会打印 got: 后面的值）
 nix-prefetch-url <url>
 ```
 
@@ -129,16 +178,35 @@ nixpkgs.url = "github:NixOS/nixpkgs/50ab793786d9de88ee30ec4e4c24fb4236fc2674";
 
 详见 [pinning.md](pinning.md)。
 
-## 换预编译二进制
+## 换上游预编译二进制
 
-`packages/sources.nix` 的 `swc` / `ripgrep` / `wcc` / `wcsc` /
-`wccModule` / `wcscModule` / `skylineClient` / `skylineSharedMemory` /
-`floatPigment` 目前来自第三方 release。
+`packages/sources.nix` 里只剩两个上游预编译产物：
 
-换版本时注意：
+| 名称 | 匹配对象 |
+| --- | --- |
+| `swc` | 官方 asar 里 `@swc/core` 的版本 |
+| `ripgrep` | 官方 asar 里 `@vscode/ripgrep` 的版本（其 `lib/postinstall.js` 的 `VERSION` 常量） |
 
-- swc 的版本要匹配官方 asar 里 `@swc/core` 的版本
-- ripgrep 的版本要匹配官方 asar 里 `@vscode/ripgrep` 的版本
-  （其 `lib/postinstall.js` 里的 `VERSION` 常量）
-- wcc/wcsc 要匹配官方 `node_modules/wcc-electron` 的行为
-- 文件名规则不能改：wcc/wcsc 保留 `.exe`，ripgrep 无后缀
+文件名规则不能改：wcc/wcsc 保留 `.exe`，ripgrep 无后缀。
+
+## 换自建模块的上游源码
+
+wcc/wcsc、skyline client、sharedMemory、float-pigment 已改为从源码构建，
+源码固定在 `packages/sources.nix` 的四个 `fetchgit` 条目里（owner 都是 `msojocs`）。
+
+```bash
+# 看某个 rev 是否有更新
+git ls-remote https://github.com/msojocs/wx-compiler.git HEAD
+```
+
+换 rev 后要重新填 `hash`（`fetchgit` 会报 `hash mismatch ... got:`，
+把 got 的值抄回去），然后**必须重新验证产物等价性**：
+
+- wcc/wcsc：编译同一段 wxml/wxss，与旧产物逐字节 diff
+- skyline / sharedMemory / float-pigment：导出符号列表一致，
+  sharedMemory 要跑一次 set/copy/remove 往返
+
+详见 [native-modules.md](native-modules.md) 的「自建的模块」。
+
+另外两个 Rust crate 的 `Cargo.lock` 放在 `packages/upstream/` 下
+（上游仓库不提交它），换 rev 时要用新版重新生成，否则依赖版本会对不上。

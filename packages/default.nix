@@ -19,15 +19,21 @@
 #   因此 $out/electron 必须是真实目录（不是符号链接），
 #   且启动器必须显式 export ELECTRON_BASE_APP_PATH。
 { lib, stdenv, fetchurl, p7zip, asar, nodejs, openssl, makeWrapper
-, autoPatchelfHook, unzip
-, alsa-lib, at-spi2-atk, cairo, cups, dbus, expat, gdk-pixbuf, glib
-, gtk3, gtk4, nss, nspr, xorg, pango, systemd, pciutils, libnotify
-, pipewire, libsecret, libpulseaudio, speechd-minimal, libdrm, mesa
-, libxkbcommon, libxshmfence, libGL, vulkan-loader, krb5, inetutils
+, patchelf, autoPatchelfHook, unzip
+, krb5, inetutils
 , cmake, python3, pkg-config, rustPlatform, fetchgit, gnutar, nodeAddonApi
-, electronHeaders, sources, asarPatches, nativeModules }:
+, electronHeaders, sources, asarPatches, nativeModules
+# Electron 的 GUI/系统运行库。默认取 flake pin 的 nixpkgs；
+# 用户可以把自己的 nixpkgs follows 到 flake 的 nixpkgs 输入上，
+# 让这 ~1G 的闭包与系统共享（见 docs/pinning.md 的「共享运行时库」）。
+, runtimePkgs }:
 
 let
+  # X 库的位置在 nixpkgs 版本间搬过：pin（24.11）里只在 xorg 下，
+  # 较新的 nixpkgs 挪到了顶层并把 xorg 标记为废弃。两边都能取到，
+  # 避免用户 follows nixpkgs 到新 nixpkgs 时刷一屏弃用警告。
+  xorgLib = name: runtimePkgs.${name} or runtimePkgs.xorg.${name};
+
   # ── 版本号：与 sources.nix 的 installer.version 保持一致 ──────────
   version = sources.installer.version;
 
@@ -58,43 +64,46 @@ let
 
     nativeBuildInputs = [ autoPatchelfHook unzip ];
     sourceRoot = ".";
+    # stdenv 的 dumpVars 会把整个构建环境导出成 env-vars，
+    # 下面的 cp -r . 会把它拷进输出，白白拖进大量构建期依赖。
+    noDumpEnvVars = 1;
 
     buildInputs = [
-      alsa-lib
-      at-spi2-atk
-      cairo
-      cups
-      dbus
-      expat
-      gdk-pixbuf
-      glib
-      gtk3
-      gtk4
-      nss
-      nspr
-      xorg.libX11
-      xorg.libxcb
-      xorg.libXcomposite
-      xorg.libXdamage
-      xorg.libXext
-      xorg.libXfixes
-      xorg.libXrandr
-      xorg.libxkbfile
-      pango
-      pciutils
+      runtimePkgs.alsa-lib
+      runtimePkgs.at-spi2-atk
+      runtimePkgs.cairo
+      runtimePkgs.cups
+      runtimePkgs.dbus
+      runtimePkgs.expat
+      runtimePkgs.gdk-pixbuf
+      runtimePkgs.glib
+      runtimePkgs.gtk3
+      runtimePkgs.gtk4
+      runtimePkgs.nss
+      runtimePkgs.nspr
+      (xorgLib "libX11")
+      (xorgLib "libxcb")
+      (xorgLib "libXcomposite")
+      (xorgLib "libXdamage")
+      (xorgLib "libXext")
+      (xorgLib "libXfixes")
+      (xorgLib "libXrandr")
+      (xorgLib "libxkbfile")
+      runtimePkgs.pango
+      runtimePkgs.pciutils
       stdenv.cc.cc
-      systemd
-      libnotify
-      pipewire
-      libsecret
-      libpulseaudio
-      speechd-minimal
-      libdrm
-      mesa
-      libxkbcommon
-      libxshmfence
-      libGL
-      vulkan-loader
+      runtimePkgs.systemd
+      runtimePkgs.libnotify
+      runtimePkgs.pipewire
+      runtimePkgs.libsecret
+      runtimePkgs.libpulseaudio
+      runtimePkgs.speechd-minimal
+      runtimePkgs.libdrm
+      runtimePkgs.mesa
+      runtimePkgs.libxkbcommon
+      (xorgLib "libxshmfence")
+      runtimePkgs.libGL
+      runtimePkgs.vulkan-loader
     ];
 
     installPhase = ''
@@ -278,7 +287,7 @@ stdenv.mkDerivation {
   pname = "wechat-devtools";
   inherit version;
 
-  nativeBuildInputs = [ p7zip asar nodejs makeWrapper ];
+  nativeBuildInputs = [ p7zip asar nodejs makeWrapper patchelf ];
 
   src = installer;
 
@@ -390,6 +399,28 @@ stdenv.mkDerivation {
     # dirname/resources/app.asar 才指向我们的 asar。
     cp -r ${electronUnwrapped}/libexec/electron/. $out/electron/
     chmod +x $out/electron/electron $out/electron/chrome-sandbox
+
+    # autoPatchelfHook 在 electronUnwrapped 里把 RPATH 第一条写成了它自己的
+    # libexec/electron。内容已经全部 cp 过来，改成 $out/electron，
+    # 否则 electron-unwrapped 会一直留在闭包里（白占 279M）。
+    chmod u+w $out/electron/electron
+    oldRpath=$(patchelf --print-rpath $out/electron/electron)
+    newRpath=$(echo "$oldRpath" | tr ':' '\n' \
+      | grep -vx '${electronUnwrapped}/libexec/electron' | paste -sd: -)
+    patchelf --set-rpath "$out/electron:$newRpath" $out/electron/electron
+
+    # 解释器也要跟 runtimePkgs 的 glibc 走。用户 follows nixpkgs 后，
+    # 系统的 glib/gtk 常比 pin 的 glibc 新；解释器若还指向 pin 的 ld，
+    # 运行时报 `GLIBC_2.xx not found`。默认（不 follows）时这里是同一路径，
+    # 等于无操作。
+    for bin in electron chrome_crashpad_handler; do
+      if [ -f "$out/electron/$bin" ]; then
+        chmod u+w "$out/electron/$bin"
+        patchelf --set-interpreter \
+          "${runtimePkgs.glibc}/lib/ld-linux-x86-64.so.2" \
+          "$out/electron/$bin"
+      fi
+    done
 
     # resources：我们的 app.asar + unpacked，electron 自带的 default_app.asar 已在
     # （electron 目录来自只读的 nix store，resources 目录权限需要放开才能写入）

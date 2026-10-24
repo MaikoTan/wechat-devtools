@@ -1,29 +1,42 @@
-{ config, lib, pkgs, ... }:
+{ config, lib, pkgs, wechatDevtoolsBuildPkgs, wechatDevtoolsRustPlatform, ... }:
 
 with lib;
 
 let
   cfg = config.services.wechat-devtools;
 
-  # 模块被 NixOS 配置 import 时，flake 的 inputs 已经就位，
-  # 但模块本身拿不到 self，所以这里按 flake 的同一套 callPackage 组装。
-  # 注意：nixpkgs 由 flake 固定，模块里用系统的 pkgs 会绕过 pin，
-  # 因此 electron 头文件等也统一从 flake 的 nixpkgs 取。
+  # 构建工具必须用 flake pin 的 nixpkgs：原生模块对着 Electron 36.6.0
+  # 内置的 libstdc++（gcc 13）编译，用系统新版 gcc 会要求更新的 GLIXX
+  # 符号，模块在 Electron 进程里加载即失败。
+  # 运行时库（gtk/mesa/llvm/...）用系统的 pkgs，闭包才能与系统共享。
+  buildPkgs = wechatDevtoolsBuildPkgs;
+
   sources = import ../packages/sources.nix;
 
-  nativeModules = pkgs.callPackage ../packages/native-modules.nix {
-    electronHeaders = pkgs.fetchurl {
-      url = sources.electronHeaders.url;
-      sha256 = sources.electronHeaders.sha256;
-    };
+  electronHeaders = buildPkgs.fetchurl {
+    url = sources.electronHeaders.url;
+    sha256 = sources.electronHeaders.sha256;
+  };
+
+  nodeAddonApi = buildPkgs.fetchurl {
+    url = "https://registry.npmjs.org/node-addon-api/-/node-addon-api-8.3.1.tgz";
+    sha256 = "fKCqetjgf4E00bC12Gd83VzyxN7VyOA18ze56Kl7veY=";
+  };
+
+  nativeModules = buildPkgs.callPackage ../packages/native-modules.nix {
+    inherit electronHeaders;
   };
 
   asarPatches = import ../packages/patches.nix {
     patchDir = ../patches;
   };
 
-  wechatDevToolsPackage = pkgs.callPackage ../packages/default.nix {
-    inherit sources asarPatches nativeModules;
+  wechatDevToolsPackage = buildPkgs.callPackage ../packages/default.nix {
+    inherit sources asarPatches nativeModules
+      electronHeaders nodeAddonApi;
+    rustPlatform = wechatDevtoolsRustPlatform;
+    # 运行时库走系统 pkgs，与系统其他 GUI 组件共享闭包
+    runtimePkgs = pkgs;
   };
 in
 {

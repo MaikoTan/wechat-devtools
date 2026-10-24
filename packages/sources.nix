@@ -10,6 +10,15 @@
     sha256 = "8a3255fe7626879b472dc5145e1b29d797f86d0a6bd9d775097f2ba5f9bb7467";
   };
 
+  # ── fenix Rust 工具链 ───────────────────────────────────────────
+  # pinned nixpkgs 的 rustc 是 1.82，编不了 skyline-native（1.85）
+  # 和 float-pigment 的依赖（1.88）。channel 与 sha256 供 flake.nix
+  # 和 modules/default.nix 共用，改版本时两处一起变。
+  rustToolchain = {
+    channel = "1.88.0";
+    sha256 = "Qxt8XAuaUR2OMdKbN4u8dBJOhSHxS+uS06Wl9+flVEk=";
+  };
+
   # ── Electron 36.6.0 头文件（编译原生模块用）────────────────────
   electronHeaders = {
     url = "https://electronjs.org/headers/v36.6.0/node-v36.6.0-headers.tar.gz";

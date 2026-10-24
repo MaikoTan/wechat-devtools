@@ -91,3 +91,66 @@ electronHeaders = fetchurl {
 2. `asar` 的 glob 行为是否变化（`matchBase` 语义）
 3. `nodejs` 内置的 node-gyp 版本（影响 `npm_config_*` 解析）
 4. `autoPatchelfHook` 的依赖列表是否要跟着 nixpkgs electron 更新
+
+## 共享运行时库（follows）
+
+构建期依赖（electron、nodejs、rust、gcc）必须来自 pin，否则 ABI 对不上。
+但**运行期依赖**（glibc、mesa、xorg、dbus、nss、cups……）没有这个限制——
+它们只被 ELF 的 `DT_NEEDED` 引用，版本兼容即可。
+
+所以 flake 把它们拆成了两个输入：
+
+| 输入 | 用途 | 默认值 |
+|------|------|--------|
+| `nixpkgs` | 运行期：glibc、mesa、xorg、dbus、nss、cups | pin（`50ab793…`，2025-06-30） |
+| `nixpkgsBuild` | 构建期：electron、nodejs、rust、gcc、patchelf | 同一个 pin |
+
+`nixpkgs` 默认跟随 pin，行为与之前完全一致。
+如果你想让这些库复用系统已有的那份，把它 `follows` 到你的 nixpkgs：
+
+```nix
+{
+  inputs.wechat-devtools.url = "github:MaikoTan/wechat-devtools";
+
+  inputs.wechat-devtools.inputs.nixpkgs.follows = "nixpkgs";
+}
+```
+
+运行期输入故意叫 `nixpkgs` 而不是 `nixpkgsRuntime`，就是为了贴合
+`inputs.<name>.inputs.nixpkgs.follows = "nixpkgs"` 这个惯用写法。
+构建期那个叫 `nixpkgsBuild`，**不要** follows 它——理由见上面的 ABI 约束。
+
+实测（nixos-unstable，glibc 2.44 / gcc 16 / mesa 26.2.5）：
+
+| 场景 | 闭包大小 | 与系统共享路径 |
+|------|----------|----------------|
+| 默认（不 follows） | 1.7 GiB | 0 / 170 |
+| follows 到系统 | 1.1 GiB | 142 / 158 |
+
+省下的 600M 全部是系统里已经存在的库。
+
+### 约束：glibc 必须一致
+
+`autoPatchelfHook` 只改 RPATH，**不改 ELF interpreter**。
+如果运行期 glibc 换了版本，解释器还指向 pin 的 `ld`，启动时会报
+`GLIBC_2.43 not found`。
+
+所以 installPhase 里显式把解释器也指向运行期 glibc：
+
+```nix
+patchelf --set-interpreter "${runtimePkgs.glibc}/lib/ld-linux-x86-64.so.2" $out/electron
+```
+
+结论：**`nixpkgs` 必须和跑这个包的系统用同一个 nixpkgs**，
+不能随便指向别的版本。跨 glibc 大版本会直接起不来。
+
+### xorg 库的路径漂移
+
+xorg 那几个库在 nixpkgs 里的位置变过：24.11 只在 `xorg.*` 下，
+26.11 挪到了顶层并废弃了 `xorg`。所以取库时写成了：
+
+```nix
+xorgLib = name: runtimePkgs.${name} or runtimePkgs.xorg.${name};
+```
+
+这样两种 nixpkgs 都能取到，也不会触发弃用警告。

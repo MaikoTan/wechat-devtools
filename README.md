@@ -16,6 +16,46 @@ nix run github:MaikoTan/wechat-devtools
 > 微信开发者工具是 unfree 软件，需要 `allowUnfree = true;`
 > （本 flake 已在内部为包开启）。
 
+### 二进制缓存（推荐）
+
+包由 GitHub Actions 构建并推送到 [Cachix](https://maikotan.cachix.org)，
+加上缓存后 `nix run` / `nix build` 会直接下载预编译产物，不用在本地编
+（要编 Electron 头文件下的 11 个原生模块，很慢）。
+
+一次性（当前用户）：
+
+```bash
+cachix use maikotan
+```
+
+声明式（NixOS）：
+
+```nix
+{ ... }:
+{
+  nix.settings = {
+    substituters = [ "https://maikotan.cachix.org" ];
+    trusted-public-keys = [
+      "maikotan.cachix.org-1:556M808HkHTnquK4IvvtfEAsej6P4mqO09ea+ncst6I="
+    ];
+  };
+}
+```
+
+flake 用户：把 input 指过来即可，缓存走上面的 `nix.settings` 配置。
+
+```nix
+{
+  inputs.wechat-devtools.url = "github:MaikoTan/wechat-devtools";
+  inputs.wechat-devtools.inputs.nixpkgs.follows = "nixpkgs";
+}
+```
+
+> [!NOTE]
+> 本仓库的 flake 没有用 `nixConfig` 声明 substituter——Nix 默认不信任
+> flake 提供的缓存配置，会警告 `ignoring untrusted flake configuration
+> setting` 并忽略。所以请在系统级 `nix.settings` 里配，或用 `cachix use`。
+
 ## 用法
 
 ### 作为系统包
@@ -56,10 +96,12 @@ CLI 需要 GUI 侧开启服务端口：`设置 -> 安全设置 -> 服务端口`�
 
 - [构建流程](docs/build.md) —— derivation 的 8 个步骤与目录结构
 - [版本固定](docs/pinning.md) —— 为什么 pin nixpkgs、Electron 36.6.0 怎么来
+- [共享运行时库](docs/pinning.md#共享运行时库follows) —— 用 follows 把运行期库复用系统那份，闭包 1.7G → 1.1G
 - [路径契约](docs/paths.md) —— IDE/CLI 数据目录如何对齐
 - [原生模块](docs/native-modules.md) —— 7 个重编译模块、4 个自建模块与 2 个上游二进制
 - [补丁说明](docs/patches.md) —— 每条补丁改什么、为什么
 - [升级指南](docs/upgrade.md) —— 换版本时要核对哪些地方
+- [CI 与二进制缓存](docs/ci.md) —— GitHub Actions 怎么构建、怎么推到 Cachix
 
 ## 已知限制
 
