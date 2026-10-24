@@ -57,7 +57,7 @@ CLI 需要 GUI 侧开启服务端口：`设置 -> 安全设置 -> 服务端口`�
 - [构建流程](docs/build.md) —— derivation 的 8 个步骤与目录结构
 - [版本固定](docs/pinning.md) —— 为什么 pin nixpkgs、Electron 36.6.0 怎么来
 - [路径契约](docs/paths.md) —— IDE/CLI 数据目录如何对齐
-- [原生模块](docs/native-modules.md) —— 7 个重编译模块与预编译替代二进制
+- [原生模块](docs/native-modules.md) —— 7 个重编译模块、4 个自建模块与 2 个上游二进制
 - [补丁说明](docs/patches.md) —— 每条补丁改什么、为什么
 - [升级指南](docs/upgrade.md) —— 换版本时要核对哪些地方
 

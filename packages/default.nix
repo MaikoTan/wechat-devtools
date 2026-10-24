@@ -24,7 +24,8 @@
 , gtk3, gtk4, nss, nspr, xorg, pango, systemd, pciutils, libnotify
 , pipewire, libsecret, libpulseaudio, speechd-minimal, libdrm, mesa
 , libxkbcommon, libxshmfence, libGL, vulkan-loader, krb5, inetutils
-, sources, asarPatches, nativeModules }:
+, cmake, python3, pkg-config, rustPlatform, fetchgit, gnutar, nodeAddonApi
+, electronHeaders, sources, asarPatches, nativeModules }:
 
 let
   # ── 版本号：与 sources.nix 的 installer.version 保持一致 ──────────
@@ -193,20 +194,30 @@ let
   };
 
   # ── 预编译的 Linux 替代二进制 ───────────────────────────────────
-  # 这些模块官方只发了 win32 变体（或需要额外工具链），
-  # 直接采用社区构建的 Linux 产物，装进 app.asar.unpacked 对应位置。
+  # swc 与 ripgrep 官方只发 win32 变体，用上游预编译产物。
   prebuilt = name: fetchurl { url = sources.${name}.url; sha256 = sources.${name}.sha256; };
 
   swc = prebuilt "swc";
   ripgrep = prebuilt "ripgrep";
-  wccBin = prebuilt "wcc";
-  wcscBin = prebuilt "wcsc";
-  wccModule = prebuilt "wccModule";
-  wcscModule = prebuilt "wcscModule";
-  skylineClient = prebuilt "skylineClient";
-  skylineSharedMemory = prebuilt "skylineSharedMemory";
-  floatPigment = prebuilt "floatPigment";
 
+  # ── 自建的 Linux 原生模块 ─────────────────────────────────────
+  # wcc/wcsc、skyline、float-pigment 以前用 msojocs 的预编译产物，
+  # 现在从源码自己构建，不再依赖第三方 release。
+  # 各模块的构建方式见 packages/upstream/ 下对应的 derivation。
+  wxCompiler = import ./upstream/wx-compiler.nix {
+    inherit lib stdenv fetchgit cmake python3 pkg-config gnutar
+      nodeAddonApi electronHeaders;
+  };
+  floatPigment = import ./upstream/float-pigment.nix {
+    inherit lib stdenv fetchgit rustPlatform;
+  };
+  skylineClient = import ./upstream/skyline-client.nix {
+    inherit lib fetchgit rustPlatform;
+  };
+  skylineSharedMemory = import ./upstream/skyline-shared-memory.nix {
+    inherit lib stdenv fetchgit fetchurl cmake python3 pkg-config gnutar
+      nodeAddonApi electronHeaders;
+  };
   # ── 启动器 ─────────────────────────────────────────────────────
   # 三个入口对应官方 Windows 包的 wechat-devtools / wechat-devtools-cli / wechatide。
   # 脚本本体放在 packages/launchers/*.sh，构建时用 substituteAll 替换 @root_dir@。
@@ -349,18 +360,22 @@ stdenv.mkDerivation {
     # wcc/wcsc：官方 getWXMLParsePath() 在非 darwin 平台取 "wcc.exe"，
     # 所以必须保留 .exe 后缀（内容是 Linux ELF）。
     mkdir -p node_modules/wcc-exec
-    install -m555 ${wccBin} node_modules/wcc-exec/wcc.exe
-    install -m555 ${wcscBin} node_modules/wcc-exec/wcsc.exe
-    install -D ${wccModule} node_modules/wcc-electron/build/Release/wcc.node
-    install -D ${wcscModule} node_modules/wcc-electron/build/Release/wcsc.node
+    install -m555 ${wxCompiler}/bin/wcc  node_modules/wcc-exec/wcc.exe
+    install -m555 ${wxCompiler}/bin/wcsc node_modules/wcc-exec/wcsc.exe
+    install -D ${wxCompiler}/modules/wcc.node  node_modules/wcc-electron/build/Release/wcc.node
+    install -D ${wxCompiler}/modules/wcsc.node node_modules/wcc-electron/build/Release/wcsc.node
 
     # Skyline 渲染引擎
-    install -D ${skylineClient} node_modules/skyline-addon/build/skyline.node
-    install -D ${skylineSharedMemory} node_modules/sharedMemory/sharedMemory.node
+    install -D ${skylineClient}/render-client.node \
+      node_modules/skyline-addon/build/skyline.node
+    install -D ${skylineSharedMemory}/sharedMemory.node \
+      node_modules/sharedMemory/sharedMemory.node
 
     # float-pigment：nodejs 与 nwjs 两个名字都要放
-    install -D ${floatPigment} node_modules/node-float-pigment-css/float-pigment-css-for-nodejs.node
-    install -D ${floatPigment} node_modules/node-float-pigment-css/float-pigment-css-for-nwjs.node
+    install -D ${floatPigment}/float-pigment.linux-x64-gnu.node \
+      node_modules/node-float-pigment-css/float-pigment-css-for-nodejs.node
+    install -D ${floatPigment}/float-pigment.linux-x64-gnu.node \
+      node_modules/node-float-pigment-css/float-pigment-css-for-nwjs.node
     cd ..
 
     # ── 6. asar 重新打包 ─────────────────────────────────────────

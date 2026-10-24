@@ -134,37 +134,49 @@
     sha256 = "ef820a62c1d6fdc396646762ff0f0e47e127947073ed8b5aa4ceea8b61cb1659";
   };
 
-  # wxml/wxss 编译器（可执行文件 + node 原生模块两份）
-  wcc = {
-    url = "https://github.com/msojocs/wx-compiler/releases/download/v0.2.0/wcc-x86_64";
-    sha256 = "6ff6b286111b1331080eb6db384e09ec50fcc1ca9d8f318219bacfae6df3f6d6";
-  };
-  wcsc = {
-    url = "https://github.com/msojocs/wx-compiler/releases/download/v0.2.0/wcsc-x86_64";
-    sha256 = "45b945bb5841b1d7c95b01fa6a5efb2ff2554ede58f00d1a07c83bf58490131b";
-  };
-  wccModule = {
-    url = "https://github.com/msojocs/wx-compiler/releases/download/v0.2.0/wcc-x86_64.node";
-    sha256 = "6d5de029f70c2171da51fe89c2057a5564b2a8024ce036df21957603cadd7f3e";
-  };
-  wcscModule = {
-    url = "https://github.com/msojocs/wx-compiler/releases/download/v0.2.0/wcsc-x86_64.node";
-    sha256 = "c5292ce334d057ded5f169d52fe5cd8d7e61f0e5eea859e065c03e2b5769516d";
+  # ── 自建源码（替代第三方预编译产物）────────────────────────────
+  # 这些模块官方只发 win32 变体，以前用 msojocs 的预编译 Linux 产物，
+  # 现在改为从源码自己构建，不再依赖第三方 release。
+  #
+  # 用 fetchgit + rev 固定 commit，升级时只需改 rev。
+  # 各仓库的构建方式见 packages/upstream/ 下对应的 derivation。
+
+  # wxml/wxss 编译器：可执行文件 + Node-API 模块两份
+  wxCompiler = {
+    type = "github";
+    owner = "msojocs";
+    repo = "wx-compiler";
+    rev = "0db632ad6fae9c8e933fa948be95ae6d5f7b7106";
   };
 
-  # Skyline 渲染引擎的 Linux 客户端与共享内存模块
-  skylineClient = {
-    url = "https://github.com/msojocs/skyline-client-server/releases/download/v2.02.2608070-2/skyline-client-linux-x86_64-v2.02.2608070-2.node";
-    sha256 = "ebdbfc9c205a168d58a3cfd6b5c5d79d1673ecdcb2ed1d45378dde584d03067f";
-  };
-  skylineSharedMemory = {
-    url = "https://github.com/msojocs/skyline-shared-memory/releases/download/v1.1.0/skyline-sharedMemory-linux-x86_64-v1.1.0.node";
-    sha256 = "944d74ececb937b51985cdcc6b15908c4984f6e2b517a9135b3318fe853036b2";
-  };
-
-  # wxss 的 float-pigment 解析器
+  # wxss 的 float-pigment 解析器（Rust napi-rs）
   floatPigment = {
-    url = "https://github.com/msojocs/float-pigment-rust/releases/download/continuous/float-pigment.linux-x64-gnu.node";
-    sha256 = "03b8a958462f5273535a9a960109ed8dbf0d49f92b3d6dcc90c21ae142e054ad";
+    type = "github";
+    owner = "msojocs";
+    repo = "float-pigment-rust";
+    rev = "2188041e41ddfb20651870acfd9a954303adabc3";
+  };
+
+  # Skyline 渲染引擎的 Linux 客户端（Rust napi-rs）
+  skylineClient = {
+    type = "github";
+    owner = "msojocs";
+    repo = "skyline-client-server";
+    rev = "6611fd29fc21b878dd221fcf8317d056dfee658f";
+  };
+
+  # Skyline 的共享内存模块（CMake + spdlog）
+  skylineSharedMemory = {
+    type = "github";
+    owner = "msojocs";
+    repo = "skyline-shared-memory";
+    rev = "7e9698f7395e97c73d0f6708c7c769e3489e87aa";
+  };
+
+  # spdlog：nixpkgs 的 libspdlog.so 用新版 gcc 编译，与 Electron 内置的
+  # libstdc++（gcc 13）ABI 不兼容，必须自己用 stdenv.cc 编一份。
+  spdlog = {
+    url = "https://github.com/gabime/spdlog/archive/refs/tags/v1.17.0.tar.gz";
+    sha256 = "2IYpVcbXTlhGs/WAsWBdJCixHZekENhuL7E+hXzTp0Q=";
   };
 }

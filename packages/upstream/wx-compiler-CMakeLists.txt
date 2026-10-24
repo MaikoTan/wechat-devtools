@@ -1,0 +1,178 @@
+cmake_minimum_required(VERSION 3.5)
+project(wx_complier VERSION 0.1.0 LANGUAGES C CXX)
+
+set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -D_REENTRANT")
+
+if(NOT DEFINED TARGET_ARCH)
+    set(TARGET_ARCH x64)
+endif()
+
+# node-addon-api 头文件目录（由 Nix 提供）
+set(NODE_ADDON_API_DIR "@NODE_ADDON_API_DIR@" CACHE PATH "node-addon-api include dir")
+set(NODE_API_HEADERS_DIR "@NODE_API_HEADERS_DIR@" CACHE PATH "node_api.h dir")
+
+# nixpkgs 的 gcc 13 头文件在 <iostream> 里声明了 _ZSt21ios_base_library_initv，
+# 它只在 gcc 15 的 libstdc++ 里提供（GLIBCXX_3.4.32）。
+# Electron 36.6.0 内置的 libstdc++ 是 gcc 13，最高只到 GLIBCXX_3.4.29，
+# 不处理这个符号会让模块在 Electron 进程里加载失败。
+# wcc/wcsc 只用 iostream 打日志，给个空实现即可。
+add_library(iostream_stub STATIC @IOSTREAM_STUB@)
+
+# 可执行文件：wcc / wcsc
+add_executable(wcc
+    src/wcc.cpp
+    src/include/wxml.h
+    src/include/night.h
+    src/wcc/usage.cpp
+    src/wxa/wxa.cpp
+    src/wxml/rewrite.cpp
+    src/wxml/name_allocator.cpp
+    src/wxml/string_templating/common.cpp
+    src/wxml/string_templating/token.cpp
+    src/wxml/dom_lib/rvm_op_code_position_recorder.cpp
+    src/wxml/dom_lib/rvm_op_code_position.cpp
+    src/wxml/dom_lib/parse_exception.cpp
+    src/wxml/dom_lib/token.cpp
+    src/wxml/dom_lib/common.cpp
+    src/wxml/dom_lib/machine.cpp
+    src/wxml/dom_lib/tokenizer.cpp
+    src/wxml/dom_lib/parser.cpp
+    src/night/night.cpp
+    src/night/ns_ast_parse.cpp
+    src/night/ns_compile_js.cpp
+    src/night/ns_node.cpp
+    src/night/ns_sourcemap.cpp
+    src/night/ns_stream.cpp
+    src/night/ns_token.cpp
+    src/night/ns_god/ns_god.cpp
+    src/night/str/str.cpp
+    src/wxml/rpx.cpp
+    src/wxml/expr_lib/base.cpp
+    src/wxml/expr_lib/bnf.cpp
+    src/wxml/expr_lib/common.cpp
+    src/wxml/expr_lib/expr_syntax_tree.cpp
+    src/wxml/expr_lib/parser.cpp
+    src/wxml/expr_lib/token.cpp
+    src/wxml/expr_lib/tokenizer.cpp
+    src/wxml/expr_lib/transit_table.cpp
+    src/wxml/compiler.cpp
+    src/wxml/dom_lib/str_cache.cpp
+    src/wxml/dom_lib/wxml_dom.cpp
+    src/utils/json.cpp
+    src/utils/string_utils.cpp
+    src/utils/file.cpp
+    )
+target_link_libraries(wcc PRIVATE iostream_stub)
+
+
+add_executable(wcsc
+    src/wcsc.cpp
+    src/wcsc/usage.cpp
+    src/wxa/wxa.cpp
+    src/wxml/common.cpp
+    src/wxml/rewrite.cpp
+    src/wxml/rpx.cpp
+    src/wxss/common.cpp
+    src/wxss/token.cpp
+    src/wxss/tokenizer.cpp
+    src/wxss/x_compiler.cpp
+    src/wxss/css_tree_lib/css_tree_lib.cpp
+    src/wxss/css_tree_lib/base.cpp
+    src/wxss/css_tree_lib/css_syntax_tree.cpp
+    src/wxss/css_tree_lib/lexical_checker.cpp
+    src/wxss/css_tree_lib/parser.cpp
+    src/wxss/css_tree_lib/rule.cpp
+    src/wxss/css_tree_lib/transit_table.cpp
+    src/utils/bittest.cpp
+    src/utils/json.cpp
+    src/utils/string_utils.cpp
+    src/utils/file.cpp
+    )
+target_link_libraries(wcsc PRIVATE iostream_stub)
+
+
+# Node-API 模块：wcc.node / wcsc.node
+add_library(wcc_module SHARED
+    src/module/wcc.cpp
+    src/module/config/wcc.hh
+    src/module/config/wcc.cc
+    src/include/wxml.h
+    src/include/night.h
+    src/wcc/usage.cpp
+    src/wxa/wxa.cpp
+    src/wxml/rewrite.cpp
+    src/wxml/name_allocator.cpp
+    src/wxml/string_templating/common.cpp
+    src/wxml/string_templating/token.cpp
+    src/wxml/dom_lib/rvm_op_code_position_recorder.cpp
+    src/wxml/dom_lib/rvm_op_code_position.cpp
+    src/wxml/dom_lib/parse_exception.cpp
+    src/wxml/dom_lib/token.cpp
+    src/wxml/dom_lib/common.cpp
+    src/wxml/dom_lib/machine.cpp
+    src/wxml/dom_lib/tokenizer.cpp
+    src/wxml/dom_lib/parser.cpp
+    src/night/night.cpp
+    src/night/ns_ast_parse.cpp
+    src/night/ns_compile_js.cpp
+    src/night/ns_node.cpp
+    src/night/ns_sourcemap.cpp
+    src/night/ns_stream.cpp
+    src/night/ns_token.cpp
+    src/night/ns_god/ns_god.cpp
+    src/night/str/str.cpp
+    src/wxml/rpx.cpp
+    src/wxml/expr_lib/base.cpp
+    src/wxml/expr_lib/bnf.cpp
+    src/wxml/expr_lib/common.cpp
+    src/wxml/expr_lib/expr_syntax_tree.cpp
+    src/wxml/expr_lib/parser.cpp
+    src/wxml/expr_lib/token.cpp
+    src/wxml/expr_lib/tokenizer.cpp
+    src/wxml/expr_lib/transit_table.cpp
+    src/wxml/compiler.cpp
+    src/wxml/dom_lib/str_cache.cpp
+    src/wxml/dom_lib/wxml_dom.cpp
+    src/utils/json.cpp
+    src/utils/string_utils.cpp
+    src/utils/file.cpp
+    )
+target_link_libraries(wcc_module PRIVATE iostream_stub)
+
+target_include_directories(wcc_module PRIVATE ${NODE_ADDON_API_DIR} ${NODE_API_HEADERS_DIR})
+target_compile_definitions(wcc_module PUBLIC -D__ADDON__)
+target_link_libraries(wcc_module PRIVATE rt pthread)
+set_target_properties(wcc_module PROPERTIES PREFIX "" SUFFIX ".node" LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
+
+add_library(wcsc_module SHARED
+    src/module/wcsc.cpp
+    src/module/config/wcsc.hh
+    src/module/config/wcsc.cc
+    src/wcsc/usage.cpp
+    src/wxa/wxa.cpp
+    src/wxml/common.cpp
+    src/wxml/rewrite.cpp
+    src/wxml/rpx.cpp
+    src/wxss/common.cpp
+    src/wxss/token.cpp
+    src/wxss/tokenizer.cpp
+    src/wxss/x_compiler.cpp
+    src/wxss/css_tree_lib/css_tree_lib.cpp
+    src/wxss/css_tree_lib/base.cpp
+    src/wxss/css_tree_lib/css_syntax_tree.cpp
+    src/wxss/css_tree_lib/lexical_checker.cpp
+    src/wxss/css_tree_lib/parser.cpp
+    src/wxss/css_tree_lib/rule.cpp
+    src/wxss/css_tree_lib/transit_table.cpp
+    src/utils/bittest.cpp
+    src/utils/json.cpp
+    src/utils/string_utils.cpp
+    src/utils/file.cpp
+    )
+target_link_libraries(wcsc_module PRIVATE iostream_stub)
+
+target_include_directories(wcsc_module PRIVATE ${NODE_ADDON_API_DIR} ${NODE_API_HEADERS_DIR})
+target_compile_definitions(wcsc_module PUBLIC -D__ADDON__)
+target_link_libraries(wcsc_module PRIVATE rt pthread)
+set_target_properties(wcsc_module PROPERTIES PREFIX "" SUFFIX ".node" LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
