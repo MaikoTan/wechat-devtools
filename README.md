@@ -1,60 +1,40 @@
-# WeChat DevTools for Linux - Unofficial Version
+# WeChat DevTools for Linux
 
-A flake wrapper of the unofficial version of WeChat DevTools from
-[msojocs](https://github.com/msojocs/wechat-web-devtools-linux).
+从**官方 Windows 安装包**构建的微信开发者工具 Linux 版。
 
-## Execute Directly
+思路与 [msojocs/wechat-web-devtools-linux](https://github.com/msojocs/wechat-web-devtools-linux)
+一致（7z 解安装包 → 删 Windows 专有文件 → 打补丁 → asar 重打包），
+但整套流程都在本仓库的 nix derivation 内可复刻，不依赖任何预打包 tarball。
+
+## 快速开始
 
 ```bash
 nix run github:MaikoTan/wechat-devtools
 ```
 
 > [!NOTE]
-> This package is an unfree software, you may need to add `allowUnfree = true;`
-> in your Nix configuration, or append `--impure` flag to the command line.
+> 微信开发者工具是 unfree 软件，需要 `allowUnfree = true;`
+> （本 flake 已在内部为包开启）。
 
-## Flake Usage
+## 用法
 
-### As a system package
-
-- Add GitHub URL into `inputs` section in your `flake.nix`
+### 作为系统包
 
 ```nix
-{
-  # ...
-  inputs.wechat-devtools.url = "github:MaikoTan/wechat-devtools";
-}
+{ inputs.wechat-devtools.url = "github:MaikoTan/wechat-devtools"; }
 ```
-
-- Add `wechat-devtools` into your installed package list, for example
 
 ```nix
 { pkgs, wechat-devtools }:
 {
-  environment.systemPackages = [
-    # ...
-    wechat-devtools.packages.x86_64-linux.default
-  ];
+  environment.systemPackages = [ wechat-devtools.packages.x86_64-linux.default ];
 }
 ```
 
-### As a NixOS module
+### 作为 NixOS 模块
 
 ```nix
-{ pkgs, ... }:
-{
-  imports = [
-    ./wechat-devtools/flake.nix
-  ];
-
-  services.wechat-devtools.enable = true;
-}
-```
-
-When the flake is an input, use the module output directly:
-
-```nix
-{ pkgs, wechat-devtools, ... }:
+{ wechat-devtools, ... }:
 {
   imports = [ wechat-devtools.nixosModules.default ];
 
@@ -62,46 +42,28 @@ When the flake is an input, use the module output directly:
 }
 ```
 
-### Customizing the package
+## 三个入口
 
-You can override the default source, version, desktop item, or extra dependencies
-by passing arguments to the package builder:
+| 命令 | 用途 |
+| --- | --- |
+| `wechat-devtools` | GUI 主界面 |
+| `wechat-devtools-cli` | 命令行（`cli open`、`cli preview` 等） |
+| `wechatide` | skill CLI（供 agent 调用） |
 
-```nix
-{ pkgs, wechat-devtools }:
-let
-  custom = wechat-devtools.packages.x86_64-linux.default.override {
-    version = "v2.01.2510290-2";
-    src = pkgs.fetchurl {
-      url = "https://example.com/wechat-devtools.tar.gz";
-      sha256 = "sha256-...";
-    };
-    enableDesktopItem = false; # disable desktop integration
-    extraPkgs = p: [ p.nss p.libxshmfence p.alsa-lib ];
-  };
-in
-{
-  environment.systemPackages = [ custom ];
-}
-```
+CLI 需要 GUI 侧开启服务端口：`设置 -> 安全设置 -> 服务端口`。
 
-## Package Options
+## 文档
 
-| Option              | Type     | Default                                | Description                                       |
-| ------------------- | -------- | -------------------------------------- | ------------------------------------------------- |
-| `version`           | string   | `null` (from nvfetcher)                | Override the upstream release version.            |
-| `src`               | path     | `null` (from nvfetcher)                | Override the upstream tarball source.             |
-| `enableDesktopItem` | bool     | `true`                                 | Whether to install the `.desktop` file and icon.  |
-| `extraPkgs`         | function | `pkgs: [ pkgs.nss pkgs.libxshmfence ]` | Extra dependencies for the steam-run wrapper.     |
+- [构建流程](docs/build.md) —— derivation 的 8 个步骤与目录结构
+- [版本固定](docs/pinning.md) —— 为什么 pin nixpkgs、Electron 36.6.0 怎么来
+- [路径契约](docs/paths.md) —— IDE/CLI 数据目录如何对齐
+- [原生模块](docs/native-modules.md) —— 7 个重编译模块与预编译替代二进制
+- [补丁说明](docs/patches.md) —— 每条补丁改什么、为什么
+- [升级指南](docs/upgrade.md) —— 换版本时要核对哪些地方
 
-## Troubleshooting
+## 已知限制
 
-- If the icon does not appear, ensure your desktop environment supports the
-  `x-scheme-handler/wechatide` MIME type.
-- If the application fails to start, check that `nss` and `libxshmfence` are
-  available in your Nix store.
-- For debugging, run:
-
-  ```bash
-  nix store path $(nix build github:MaikoTan/wechat-devtools#packages.x86_64-linux.default)
-  ```
+- `extract-file-icon` 编译产出但 Linux 上不会加载
+  （官方 `dist/index.js` 只在 win32/darwin require 它）
+- esbuild 官方只发 win32 变体，Linux 下不可用
+- 仅支持 `x86_64-linux`

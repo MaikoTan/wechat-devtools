@@ -1,0 +1,16 @@
+[Desktop Entry]
+Type=Application
+Name=微信开发者工具
+Name[zh_CN]=微信开发者工具
+Name[zh_TW]=微信開發者工具
+Name[en]=WeChat Devtools
+GenericName=WeChat Devtools
+Comment=The development tools for wechat miniprogram development
+Comment[zh_CN]=微信小程序开发工具
+Comment[zh_TW]=微信小程序開發工具
+Exec=@out@/bin/wechat-devtools %U
+Icon=wechat-devtools
+Terminal=false
+Categories=Development;IDE;WebDevelopment;
+MimeType=x-scheme-handler/wechatide;
+Keywords=wechat;miniprogram;devtools;微信;小程序;
