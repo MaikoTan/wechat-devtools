@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+
+# PR 互相取消；master 上的推送不取消，避免打断 cachix 推送。
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  build:
+    name: build & push to cachix
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      # fetchgit 要从 github.com 拉 4 个上游仓库，带 token 避免 API 限流。
+      - uses: cachix/install-nix-action@v31
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+            access-tokens = github.com=${{ secrets.GITHUB_TOKEN }}
+
+      # 只有 master 推送时才写缓存；PR（尤其是 fork PR，拿不到 secret）只读。
+      - uses: cachix/cachix-action@v17
+        with:
+          name: maikotan
+          authToken: '${{ secrets.CACHIX_PUSH_TOKEN }}'
+          skipPush: ${{ github.event_name != 'push' }}
+
+      - name: nix flake check
+        run: nix flake check -L --show-trace
+
+      - name: nix build
+        run: nix build -L .#wechat-devtools
+
+      # 冒烟测试：CLI 能起来说明 asar 重打包与原生模块装载都没坏。
+      - name: smoke test
+        run: |
+          ./result/bin/wechat-devtools-cli --help
