@@ -1,0 +1,13 @@
+# statix 配置。statix 默认在当前目录找 statix.toml。
+#
+# W04（manual_inherit_from）在 statix 0.5.8 上是坏的：它把路径字面量
+# （file = ./rust-toolchain.toml;）、字符串字面量（url = "https://...";）
+# 甚至已经是 inherit 的语句（inherit (sources.rustToolchain) sha256;）
+# 都报成 W04。这些没法靠改代码消掉——inherit 语句本身就被它标了。
+# 新版 statix 已修掉这个误报，所以这里直接关掉。
+disabled = ["manual_inherit_from"]
+
+nix_version = "2.4"
+
+# result 是 nix build 留下的符号链接，指向 store 里的构建产物。
+ignore = ["result", "a.patch"]

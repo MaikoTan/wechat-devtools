@@ -6,9 +6,9 @@
 
 | 步骤 | 命令 | 作用 |
 | --- | --- | --- |
-| flake check | `nix flake check -L` | statix  lint + NixOS 模块求值 |
+| flake check | `nix flake check -L` | statix lint + NixOS 模块求值 + 原生模块装载 |
 | build | `nix build -L .#wechat-devtools` | 完整构建 |
-| smoke test | `./result/bin/wechat-devtools-cli --help` | 确认 asar 重打包与原生模块装载没坏 |
+| smoke test | `./result/bin/wechat-devtools-cli --help` | 确认包装层与 asar 重打包没坏 |
 
 构建产物由 [cachix-action](https://github.com/cachix/cachix-action) 推到
 `maikotan` 缓存（<https://maikotan.cachix.org>）。
@@ -33,6 +33,47 @@ on:
     skipPush: ${{ github.event_name != 'push' }}
 ```
 
+
+## flake check 覆盖什么
+
+`nix flake check` 跑三个 check：
+
+| check | 作用 |
+| --- | --- |
+| `checks.statix` | Nix 代码 lint |
+| `checks.native-modules` | 把 5 个原生模块逐个 `require` 一遍 |
+| `nixosModules.default` | NixOS 模块能求值 |
+
+`checks.native-modules` 是后来补的。CLI 的 `--help` 只打印帮助，
+**不会装载 `.node`**，所以原生模块的 ABI 回归（缺 `GLIBCXX` 符号、
+模块版本不匹配）在 smoke test 里完全看不见。这个 check 用 pin 里的
+`nodejs_22`（与 Electron 36 内置的 Node 大版本一致）真加载一遍：
+
+```
+OK   wcc-electron/build/Release/wcc.node
+OK   wcc-electron/build/Release/wcsc.node
+OK   node-float-pigment-css/float-pigment-css-for-nodejs.node
+OK   skyline-addon/build/skyline.node
+OK   sharedMemory/sharedMemory.node
+5/5 模块加载成功
+```
+
+### statix 的 W04 是坏的
+
+`statix.toml` 里关掉了 `manual_inherit_from`（W04）。statix 0.5.8 的
+W04 把路径字面量、字符串字面量、甚至**已经是 inherit 的语句**都报成
+W04：
+
+```nix
+file = ./rust-toolchain.toml;              # 路径字面量，被标
+inherit (sources.rustToolchain) sha256;    # 已经是 inherit，也被标
+```
+
+这些没法靠改代码消掉。新版 statix 已修掉该误报，所以直接禁用。
+
+另外 `statix check` 的 `-c` 默认从**当前工作目录**找配置，不是从
+target 目录找。check 里必须显式写 `-c ${./.}`，否则在 store 副本上
+跑时读不到 `statix.toml`，W04 会全部冒出来。
 PR 仍然会**读**缓存（省构建时间），只是不写。
 fork PR 拿不到 `CACHIX_PUSH_TOKEN`，`authToken` 为空串，
 cachix-action 此时只注册 substituter，不会报错。

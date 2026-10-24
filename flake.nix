@@ -89,7 +89,18 @@
             src = ./.;
             nativeBuildInputs = [ pkgs.statix ];
           } ''
-            statix check ${./.} --config ${./.}/.statix.toml
+            statix check -c ${./.} ${./.}
+            touch $out
+          '';
+
+          # 原生模块装载冒烟测试。CLI 的 --help 不会碰 .node，
+          # ABI 回归（缺 GLIBCXX 符号、模块版本不匹配）只有真加载才发现。
+          # 用 pin 里的 nodejs_22，与 Electron 36 内置的 Node 大版本一致。
+          checks.native-modules = pkgs.runCommandLocal "native-modules-check" {
+            nativeBuildInputs = [ pkgs.nodejs ];
+          } ''
+            node ${./packages/smoke-test.mjs} \
+              ${package}/electron/resources/app.asar.unpacked
             touch $out
           '';
         });

@@ -39,7 +39,8 @@ jobs:
       - name: nix build
         run: nix build -L .#wechat-devtools
 
-      # 冒烟测试：CLI 能起来说明 asar 重打包与原生模块装载都没坏。
+      # CLI 能起来只说明包装层没坏。原生模块的装载由上面的
+      # nix flake check（checks.native-modules）覆盖，--help 碰不到 .node。
       - name: smoke test
         run: |
           ./result/bin/wechat-devtools-cli --help
